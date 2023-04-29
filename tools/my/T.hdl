@@ -1,0 +1,7 @@
+/** this is the first hdl file wtitten by me */
+CHIP T {
+IN  x[16];
+OUT out[16];
+PARTS:
+ Not16(in=x,out=out);
+}

@@ -1,0 +1,982 @@
+class compilationengine2():
+    def __init__(self,a,b,c):
+        self.lex=a               #all the lexical element
+        self.typ=b               # all the type corresponding 
+        self.filename=c
+        if len(a)!=len(b):
+            raise self.FooError('length corresponde error!')
+        self.flow=1
+        self.classtable=[]
+        self.subroutinetable=[]
+        self.classname=None
+        self.scop=0
+        self.WHILEFLAG=0
+        self.IFFLAG=0
+        self.vmWriter=None
+        self.functionname=None
+        self.Subroutine_Flag=None
+        self.expressionListNum=0
+        
+        self.classvardecselection=['static','field']
+        self.subrotinedecselection=['constructor','function','method']
+        self.statementselection=['let','if','while','do','return']
+        self.expresskeyword=['true','false','null','this']
+        self.op=['+','-','*','/','&','|','<','>','=']
+        self.unaryop=['~','-']
+        self.vmWriter=None
+        #print(len(a))
+    class FooError(ValueError):
+        pass
+    
+
+    def checksymbol(self,q):
+        flag=0
+        if self.scope==2:
+            flag=self.findcount(q,2)
+            if flag==0:
+                flag=self.findcount(q,1)
+        elif self.scope==1:
+            flag=self.findcount(q,1)
+            
+        if flag==0:
+            raise self.FooError('%s is not decleared'%s)
+        else:
+            return True
+            
+            
+    def findpro(self,s,q):
+        if q==1:
+            a=self.classtable
+        elif q==2:
+            a=self.subroutinetable
+        i=0
+        #print(len(a))
+        for i in range(len(a)):
+            if a[i]['name']==s:
+                break
+        if i< len(a):
+            return   {'name':a[i]['name'],'type':a[i]['type'],'kind':a[i]['kind'],'index':a[i]['index']} 
+        else:
+            return None  
+
+
+    def findcount(self,a,b):
+        count=0
+        #print('a is ',a.lower())
+        if b==2:
+            for i in self.subroutinetable:
+                #print('i',i['name'])
+                if i['name']==a.lower():
+                    count=count+1
+            return count
+        elif b==1:
+            for i in self.classtable:
+                #print(i['kind'])
+                #print(a.lower())
+                if i['name']==a.lower():
+                    count=count+1    
+            return count
+            
+    
+    def varcount(self,a):
+        count=0
+        if self.scope==2:
+            #print(a)
+            for i in self.subroutinetable:
+                #print(i['kind'])
+                #print(a.lower())
+                if i['kind']==a.lower():
+                    count=count+1    
+            return count
+        elif self.scope==1:
+            for i in self.classtable:
+                if i['kind']==a.lower:
+                    count=count+1
+            return count
+        else:
+            raise self.FooError('not in class or the subroutine') 
+    
+    
+    
+    def define(self,name,typehere,kind):
+        indx=self.varcount(kind)
+        if (kind=='static' or kind=='filed') and self.scope==1:
+            self.classtable.append( {'name':name,'type':typehere,'kind':kind,'index':indx+1})
+        elif (kind=='var' or kind=='argument') and self.scope==2:
+            self.subroutinetable.append( {'name':name,'type':typehere,'kind':kind,'index':indx+1})
+        else:
+            raise self.FooError('the var is not matching the frame') 
+    
+    
+    
+    def proper(self,s):
+        if self.scope==1:
+            result=findpro(s,1)
+            if result==None:
+                raise self.FooError('%s not in class'%s)
+            else:
+                return result
+        elif self.scope==2:
+            result=self.findpro(s,2)
+            if result==None:
+                result=self.findpro(s,1)
+                if result==None:
+                    raise self.FooError('%s not in class or the subroutine'%s)
+            return result    
+ 
+
+    
+    def compilestart(self):
+        if self.flow!=0:
+            self.flow=0
+        endname=self.filename.split('\\')[-1]
+        self.file=open(self.filename+'\\'+endname+'final'+'.xml','w')
+        self.file2=open(self.filename+'\\'+endname+'.vm','w')
+        self.vmWriter=VMwriter(self.file2)
+        self.complieclass()
+        self.file.close()
+        self.file2.close()
+    def writeinto(self,typ,token):
+        if typ == 'symbol':
+            if token=='>':
+                self.file.write('<'+typ+'> '+'&gt;'+' </'+typ+'>\n')
+            elif token=='<':
+                self.file.write('<'+typ+'> '+'&lt;'+' </'+typ+'>\n')
+            elif token=='&':
+                self.file.write('<'+typ+'> '+'&amp;'+' </'+typ+'>\n')
+            else:
+                self.file.write('<'+typ+'> '+token+' </'+typ+'>\n')
+        else:
+            self.file.write('<'+typ+'> '+token+' </'+typ+'>\n')
+        #print(token)
+
+ #以下是some main declaration
+
+
+
+
+    def writeArrayPush(self,symbolName):
+        #This function is used in 'Push' Array Terms.
+        SubTag=self.findcount(symbolName,2)
+        if SubTag==0:
+            ClassTag=self.findcount(symbolName,1)
+            if ClassTag==0:
+                print ('Error Term!')
+                raise self.FooError('somethingwrong in the writeArrayPush ')
+            else:
+                self.vmWriter.writePush('this',self.findcount(symbolName,1)['index'-1])
+        else:
+            prolist=self.findpro(symbolName,2)
+            KINDFLAG=prolist['kind']
+            index=prolist['index']
+            self.vmWriter.writePush(KINDFLAG,index-1)
+
+
+
+    #yes
+    def complieclass(self):
+    
+        if self.lex[self.flow]!='class':
+            raise self.FooError('file need start with Class,not the %s!',self.lex[self.flow])
+        
+        
+        #write the class
+        self.file.write('<'+'class'+'>'+'\n')
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        #write the class name
+        self.flow=self.flow+1
+        if self.typ[self.flow]!='identifier':
+            raise self.FooError('class name should be identifier,%s is wrong',self.typ[self.flow])
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        
+        self.classname=self.lex[self.flow]   #record the class name
+        self.scope=1                          #in  the class  scope
+        
+        
+        
+        
+        #这里算是进入了class body{},now the pointer is in the  {,根据subroutinebody 的惯例，body应该把{}算进去
+        self.flow=self.flow+1
+        self.classbody()
+        
+     
+        #write the  }
+                
+        
+        #enter the calss end  and this is a end of a file
+        self.scope=self.scope-1
+        print('the class table is ',self.classtable)
+        self.classtable=[]
+        self.file.write('<'+'/'+'class'+'>'+'\n')
+    
+    
+    
+    
+    
+    #yes
+    def classbodyjudge(self):
+        if self.lex[self.flow] in self.subrotinedecselection:
+            self.subroutineDec()
+        elif self.lex[self.flow] in self.classvardecselection:
+            self.classVarDec()
+            
+            
+            
+    
+                       
+    #yes
+    def classbody(self):
+        #write the {
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        
+        self.flow=self.flow+1
+        while  self.lex[self.flow] != '}':
+            self.classbodyjudge()
+            #print(self.flow)
+        
+        #write the }
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+     
+    
+    
+    
+    #yes
+    def classVarDec(self):
+        self.file.write('<'+'classVarDec'+'> '+'\n')
+        
+        # write varDec
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+
+        # write type 
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        kind=self.lex[self.flow-1]         #record the kind 
+        typehere=self.lex[self.flow]       #record the typehere
+        
+        # write varname 
+        self.flow=self.flow+1
+        er=0
+        while (self.lex[self.flow]!=';'):
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+            if self.typ[self.flow] == 'identifier':
+                name=self.lex[self.flow]
+                self.define(name,typehere,kind)
+            
+            self.flow=self.flow+1
+            er=er+1
+            if er>15:
+                raise self.FooError('forget semicolon or too many vars ')
+        #now the pointer is to the semicolon,now write the semocolon
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.file.write('<'+'/'+'classVarDec'+'> '+'\n')
+        self.flow=self.flow+1
+    
+    
+    #yes
+    def varDec(self):
+        self.file.write('<'+'varDec'+'> '+'\n')
+        
+        
+        # write varDec
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        # write type 
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        typehere=self.lex[self.flow]
+        kind=self.lex[self.flow-1]
+        
+        
+        # write varname 
+        self.flow=self.flow+1
+        er=0
+        while (self.lex[self.flow]!=';'):
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            if self.typ[self.flow]=='identifier':
+                name=self.lex[self.flow]
+                self.define(name,typehere,kind)
+                #print(self.subroutinetable)
+                #print(name,typehere,kind)
+            self.flow=self.flow+1
+            er=er+1
+            if er>15:
+                raise self.FooError('forget semicolon or too many vars ')
+        
+        
+        #now the pointer is to the semicolon
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.file.write('<'+'/'+'varDec'+'> '+'\n')
+        self.flow=self.flow+1
+        
+    #yes
+    def subroutineDec(self):
+        self.file.write('<'+'subroutineDec'+'> '+'\n')
+        
+        self.WHILEFLAG=0
+        self.IFFLAG=0
+        self.scope=self.scope+1
+        self.Subroutine_Flag=self.lex[self.flow]
+        if self.Subroutine_Flag=='method':
+            self.define('this',self.classname,'argument')
+
+        self.functionname=self.classname+ '.'+self.lex[self.flow+2]
+        
+        #write the type1 of subroutine 
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        #write the type2 of subroutine 
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+          
+            
+        #write the name of subroutine
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])        
+        
+        
+        #write the (  
+        self.flow=self.flow+1  
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        self.flow=self.flow+1
+        self.parameterList()
+        
+        #write the )
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        #enter the subroutinebody
+        self.flow=self.flow+1
+        self.subroutineBody()
+
+        
+        #now the subroutinebody is over ,the pointer is in the } 
+        self.scope=self.scope-1
+        print('subroutinetable is ',self.subroutinetable)
+        self.subroutinetable=[]
+        self.file.write('<'+'/'+'subroutineDec'+'> '+'\n')
+    
+    
+    #yes
+    def subroutineBody(self):
+        self.file.write('<'+'subroutineBody'+'> '+'\n')
+        
+        #write the {
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.flow=self.flow+1
+           
+        while self.lex[self.flow]!='}' :
+            self.subroutineBodyjudge()
+            
+            
+        #write the }
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.file.write('<'+'/'+'subroutineBody'+'> '+'\n')
+        self.flow=self.flow+1
+    
+    
+    #yes
+    def subroutineBodyjudge(self):   
+        if self.lex[self.flow] == 'var':
+            self.varDec()
+        elif self.lex[self.flow] in self.statementselection:  #maybe need check 
+            localnum=self.varcount('var')
+            self.vmWriter.writeFunction(self.functionname,localnum)
+            if self.Subroutine_Flag=='method':
+                self.vmWriter.writePush('argument',0)
+                self.vmWriter.writePop('pointer',0)
+            elif self.Subroutine_Flag=='constructor':
+                #FieldNum=self.findcount('field',1)
+                FieldNum=self.varcount('field',1)
+                
+                self.vmWriter.writePush('constant',FieldNum)
+                self.vmWriter.writeCall('Memory.alloc',1)
+                self.vmWriter.writePop('pointer',0)
+            self.statements()
+        else:
+            raise self.FooError('something wrong in the subroutineBodyjudge')
+            
+            
+            
+    #yes
+    def parameterList(self):              
+        self.file.write('<'+'parameterList'+'> '+'\n')
+        
+        er=0
+        while self.lex[self.flow]!=')':
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            if self.typ[self.flow] == 'keyword':
+                typhere=self.lex[self.flow]
+                name=self.lex[self.flow+1]
+                kind='argument'
+                self.define(name,typehere,kind)
+            self.flow=self.flow+1
+            er=er+1
+            if er>20:
+                raise self.FooError('forget bracket or too many vars ')
+                       
+        self.file.write('<'+'/'+'parameterList'+'> '+'\n')
+    
+ #以下是statements
+    #yes
+    def statements(self):            
+        self.file.write('<'+'statements'+'> '+'\n')
+        if self.lex[self.flow] not in self.statementselection:
+            raise self.FooError('statement error! ')
+        
+        while self.lex[self.flow] in self.statementselection:
+            self.statementjudge()
+        
+        
+        self.file.write('<'+'/'+'statements'+'> '+'\n')
+        #self.flow=self.flow+1
+    
+    
+    #yes
+    def statementjudge(self):                
+        if self.lex[self.flow] == 'let':
+            self.letStatement()
+        elif self.lex[self.flow] == 'if':
+            self.ifStatement()
+        elif  self.lex[self.flow] == 'return':
+            self.returnStatement()
+        elif self.lex[self.flow] == 'while':
+            self.whileStatement()
+        elif  self.lex[self.flow] == 'do':
+            self.doStatement()
+    
+    #yes
+    def whileStatement(self):
+        self.file.write('<'+'whileStatement'+'> '+'\n')
+        
+        sub_WHILEFLAG=self.WHILEFLAG
+        self.WHILEFLAG+=1
+        self.vmWriter.writeLabel('WHILE_START'+str(sub_WHILEFLAG))
+        
+        
+        #write the 'while'
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        # write the (
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        #enter the expression
+        self.flow=self.flow+1
+        self.expression()
+        
+        
+        #write the )
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        self.vmWriter.writeArithmetic('not')
+        self.vmWriter.writeIf('WHILE_OVER'+str(sub_WHILEFLAG))
+        
+        
+        #write the {
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        #enter the statements
+        self.flow=self.flow+1
+        self.statements()
+        
+        
+        #write the }
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        self.vmWriter.writeGoto('WHILE_START'+str(sub_WHILEFLAG))
+        self.vmWriter.writeLabel('WHILE_OVER'+str(sub_WHILEFLAG))
+        
+        
+        
+        self.file.write('<'+'/'+'whileStatement'+'> '+'\n')
+        self.flow=self.flow+1
+        
+    #yes
+    def letStatement(self):
+        self.file.write('<'+'letStatement'+'> '+'\n')
+        
+        #write the let
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        #write the varname
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        LetVarName=self.lex[self.flow]
+        #print('the scope is ',self.scope)
+        #print('the name is ',LetVarName)
+        prolist=self.proper(LetVarName)
+
+        
+        #judge if the array index appear
+        self.flow=self.flow+1
+        if self.lex[self.flow] == '[':     
+            self.writeArrayPush(LetVarName)                    #writeArrayPush
+            #write the [
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+            self.flow=self.flow+1
+            self.expression()
+            
+            
+            self.vmWriter.writeArithmetic('add')               
+            
+            #write the ]
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+            #go out the []
+            self.flow=self.flow+1
+            #write the =
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+
+
+            #enter the expression
+            self.flow=self.flow+1
+            self.expression()
+
+            self.vmWriter.writePop('temp',0)
+            self.vmWriter.writePop('pointer',1)
+            self.vmWriter.writePush('temp',0)
+            self.vmWriter.writePop('that',0)
+            
+            
+
+            #write the semicolon
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        elif self.lex[self.flow] =='=':
+            #write the =
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+
+
+            #enter the expression
+            self.flow=self.flow+1
+            self.expression()
+
+            
+            self.vmWriter.writePop(prolist['kind'],prolist['index']-1)
+            
+            
+            #write the semicolon
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])            
+        
+        
+        self.file.write('<'+'/'+'letStatement'+'> '+'\n')
+        self.flow=self.flow+1
+        
+
+    #yes
+    def doStatement(self):
+        self.file.write('<'+'doStatement'+'> '+'\n')
+        
+        #write do 
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        # write subroutine call
+        self.flow=self.flow+1
+        if self.lex[self.flow+1]=='.':
+            self.subroutinecall1()
+        elif self.lex[self.flow+1]=='(':
+            self.subroutinecall2()
+        
+        
+        self.vmWriter.writePop('temp',0)
+        #write the semicolon
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.file.write('<'+'/'+'doStatement'+'> '+'\n')
+        self.flow=self.flow+1        
+    
+    
+    #yes
+    def returnStatement(self):
+        self.file.write('<'+'returnStatement'+'> '+'\n')
+         
+        # write the return 
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        # enter the expression
+        self.flow=self.flow+1
+        if self.lex[self.flow]!=';':
+            self.expression()
+             #write the semicolon
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            self.vmWriter.writeReturn()
+            
+        else:
+            
+            self.vmWriter.writePush('constant',0)
+            self.vmWriter.writeReturn()
+            
+            
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+        self.file.write('<'+'/'+'returnStatement'+'> '+'\n')
+        self.flow=self.flow+1
+    
+    
+    #yes
+    def ifStatement(self):       
+        self.file.write('<'+'ifStatement'+'> '+'\n')
+        sub_IFFLAG=self.IFFLAG
+        self.IFFLAG+=1
+        
+        #write the if
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        #write the (
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        #enter the expression
+        self.flow=self.flow+1
+        self.expression()
+        
+        #write the )
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        self.vmWriter.writeArithmetic('not')
+        self.vmWriter.writeIf('IF_RIGHT'+str(sub_IFFLAG))        
+        
+        #write the {
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        #enter the statement
+        self.flow=self.flow+1
+        self.statements()
+        
+        #write the }
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        #go out the if 
+        self.flow=self.flow+1
+        
+        if self.lex[self.flow]=='else':
+            #write the else
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+            self.vmWriter.writeGoto('IF_WRONG'+str(sub_IFFLAG))
+            self.vmWriter.writeLabel('IF_RIGHT'+str(sub_IFFLAG))
+            
+            #write the {
+            self.flow=self.flow+1
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+            #enter the statements
+            self.flow=self.flow+1
+            self.statements()
+            
+            #write the }
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            
+            self.vmWriter.writeLabel('IF_WRONG'+str(sub_IFFLAG))
+            
+            
+            #go out the if 
+            self.flow=self.flow+1
+        else :
+            self.vmWriter.writeLabel('IF_RIGHT'+str(sub_IFFLAG))
+        
+        self.file.write('<'+'/'+'ifStatement'+'> '+'\n')
+    
+  
+
+
+ #以下是expression
+    #yes
+    def expression(self):               #########
+        self.file.write('<'+'expression'+'> '+'\n')
+        self.term()
+        while self.lex[self.flow] in self.op:
+            self.opterm()    
+        self.file.write('<'+'/'+'expression'+'> '+'\n')
+        
+        #没写完，考虑一下expression list  
+    
+    
+    #yes                                     
+    def opterm(self):
+        #write the op 
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        operator = self.lex[self.flow]
+                   
+            
+        self.flow=self.flow+1
+        
+        self.term() #这个地方可能要注意一下，这里调用出来的term需不需要加引号头
+        if operator == '+':
+            self.vmWriter.writeArithmetic('add')
+        elif operator == '-':
+            self.vmWriter.writeArithmetic('sub')
+        elif operator == '*':
+            self.vmWriter.writeCall('Math.multiply', 2)
+        elif operator == '/':
+            self.vmWriter.writeCall('Math.divide', 2)
+        elif operator == '&':
+            self.vmWriter.writeArithmetic('and')
+        elif operator == '|':
+            self.vmWriter.writeArithmetic('or')
+        elif operator == '<':
+            self.vmWriter.writeArithmetic('lt')
+        elif operator == '>':
+            self.vmWriter.writeArithmetic('gt')
+        elif operator == '=':
+            self.vmWriter.writeArithmetic('eq') 
+        
+    #yes
+    def term(self):
+        self.file.write('<'+'term'+'> '+'\n')
+        
+        if self.lex[self.flow] in self.expresskeyword:
+            self.expressKeywordConstant()
+        elif self.typ[self.flow]=='integerConstant':
+            self.expressintegerConstant()
+        elif self.typ[self.flow]=='stringConstant':
+            self.stringConstant()
+        elif  self.lex[self.flow]=='(':
+            #write the (
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            self.flow=self.flow+1
+            self.expression()
+            
+            #write the )
+            self.writeinto(self.typ[self.flow],self.lex[self.flow])
+            self.flow=self.flow+1
+            
+        elif self.lex[self.flow] in self.unaryop:
+            self.unaryopterm()
+        elif self.typ[self.flow]=='identifier':
+            self.termfour()
+            
+            
+        self.file.write('<'+'/'+'term'+'> '+'\n')
+    #没写完，考虑一下expression list    
+            
+    
+    def unaryopterm(self):
+        #write the unarayop
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        UnaryOp=self.lex[self.flow]
+        self.flow=self.flow+1
+        self.term()
+        if UnaryOp == '-':
+            self.vmWriter.writeArithmetic('neg')
+        else:
+            self.vmWriter.writeArithmetic('not')
+    
+    
+    def stringConstant(self):
+        #write the stringconstant
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.flow=self.flow+1
+        
+        string_copy=self.lex[self.flow].strip('"')
+        string_length=len(string_copy)
+        self.vmWriter.writePush('constant',string_length)
+        self.vmWriter.writeCall('String.new',1)
+        for i in range(0,string_length):
+            self.vmWriter.writePush('constant',ord(string_copy[i]))
+            self.vmWriter.writeCall('String.appendChar',2)
+        
+        
+    def expressKeywordConstant(self):
+        #write the Keyword
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.flow=self.flow+1
+        
+        kWord=self.lex[self.flow]
+        if kWord=='true':
+            self.vmWriter.writePush('constant',1)
+            self.vmWriter.writeArithmetic('neg')
+        elif kWord=='false' or kWord=='null':
+            self.vmWriter.writePush('constant',0)
+        elif kWord=='this':
+            self.vmWriter.writePush('pointer',0)
+        
+
+        
+    
+    def expressintegerConstant(self):
+        
+        #write the constant
+        self.vmWriter.writePush('constant',self.lex[self.flow])
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.flow=self.flow+1
+        #print(self.lex[self.flow])
+        #self.vmWriter.writePush('constant',int(self.lex[self.flow]))
+        
+    
+    #yes    
+    def termfour(self):
+        if self.lex[self.flow+1]=='[':
+            self.arrayvariable()
+        elif self.lex[self.flow+1]=='.':
+            self.subroutinecall1()
+        elif self.lex[self.flow+1]=='(':     #这里需要再检查一下，是不是多出了一个subroutinecall2
+            self.subroutinecall2()          # the two ways of subroutine call corresponds the two types in the subroutinecall in the book
+        else:
+            self.variablealone()
+    
+    
+    #yes
+    def arrayvariable(self):
+        
+        # write the name
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.writeArrayPush(self.lex[self.flow])
+
+        
+        # write the [
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        # enter the expression
+        self.flow=self.flow+1
+        self.expression()
+        self.vmWriter.writeArithmetic('add')
+        self.vmWriter.writePop('pointer',1)
+        self.vmWriter.writePush('that',0)
+         # write the ]
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.flow=self.flow+1
+        
+    #yes    
+    def subroutinecall1(self):
+        sub_MethodFlag=False 
+        # write the name
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        sub_className=self.lex[self.flow]
+        sub_funcName=self.lex[self.flow+2]
+        
+        SubCallTag=self.findcount(sub_className,2)
+        if  SubCallTag==0:
+            ClassCallTag=self.findcount(sub_className,1)
+            if ClassCallTag==0:
+                sub_Name=sub_className+'.'+sub_funcName
+            else:
+                sub_MethodFlag=True
+                pro=findpro(sub_className,1)
+                sub_className=pro['type'] 
+                sub_index=pro['index']
+                self.vmWriter.writePush('this',sub_index-1)
+                sub_Name=sub_className+'.'+sub_funcName
+        else:
+            sub_MethodFlag=True
+            pro=findcount(sub_className,2)
+            sub_className=pro['type']
+            sub_index=pro['index']
+            self.vmWriter.writePush('local',sub_index-1)
+            sub_Name=sub_className+'.'+sub_funcName
+
+        
+        #write the .
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        #enter the name2
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+
+        #enter the (
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        self.flow=self.flow+1
+        self.expressionList()
+        
+        #write the )
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        if sub_MethodFlag:
+            self.vmWriter.writeCall(sub_Name,self.expressionListNum+1)
+        else:
+            self.vmWriter.writeCall(sub_Name,self.expressionListNum)
+        
+        
+        
+        self.flow=self.flow+1
+    
+    #yes
+    def subroutinecall2(self):
+        # write the name
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        sub_className=self.lex[self.flow]
+        sub_Name=self.ClassName+'.'+sub_className
+        self.vmWriter.writePush('pointer',0)
+        
+        #write the (
+        self.flow=self.flow+1
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        
+        #enter the expressionlist
+        self.flow=self.flow+1
+        self.expressionList()
+        
+        self.vmWriter.writeCall(sub_Name,self.expressionListNum+1)
+        
+        #write the )
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        
+        self.flow=self.flow+1        
+        
+    
+    
+    
+    
+    #yes
+    def variablealone(self):
+        #variable name
+        self.writeinto(self.typ[self.flow],self.lex[self.flow])
+        self.flow=self.flow+1
+        
+        ListSeg=self.proper(self.lex[self.flow])
+        self.vmWriter.writePush(ListSeg['kind'],ListSeg['index']-1)
+
+    
+    #yes
+    def expressionList(self):
+        self.expressionListNum=0
+        if self.lex[self.flow]!=')':
+            self.file.write('<'+'expressionList'+'> '+'\n')
+            
+            
+            
+            
+            if self.lex[self.flow]!=')':
+                self.expressionListNum+=1
+                self.expression()
+                #print("unloead")
+            
+            while self.lex[self.flow]!=')':
+                self.writeinto(self.typ[self.flow],self.lex[self.flow])
+                self.flow=self.flow+1
+                self.expression()
+                self.expressionListNum+=1
+
+
+            self.file.write('<'+'/'+'expressionList'+'> '+'\n')
+        else :
+            self.file.write('<'+'expressionList'+'> '+'\n')
+            self.file.write('<'+'/'+'expressionList'+'> '+'\n')
